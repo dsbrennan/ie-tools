@@ -1,0 +1,39 @@
+{% extends 'portal.html'%}
+{% block title %}{{ name }}{% endblock %}
+{% block header %}
+    <style type="text/css">
+        form{height:100%;}
+    </style>
+{% endblock %}
+{% block content %}
+<form method="POST" class="d-flex flex-column">
+    <div class="row mb-3">
+        <div class="col-8">
+            {% if errors|length > 0 %}
+            <div class="card bg-danger text-white">
+                <div class="card-header">Error processing request</div>
+                <div class="card-body">
+                    <p class="card-text">{{ errors }}</p>
+                </div>
+            </div>
+            {% else %}
+            <div class="card bg-info text-white">
+                <div class="card-header">Information</div>
+                <div class="card-body">
+                    <p class="card-text">Paste into the textbox below your Irreducible Element model JSON, you then will be able to save and validate this IE Model</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        <div class="col">
+            <button type="submit" name="save" class="btn btn-block btn-outline-secondary">
+                Save
+            </button>
+        </div>
+    </div>
+    <div class="form-group d-flex flex-column flex-fill">
+        <label>IE Model JSON</label>
+        <textarea name="ie-model-json" class="form-control flex-fill" rows="15" required>{{ model }}</textarea>
+    </div>
+</form>
+{% endblock %}

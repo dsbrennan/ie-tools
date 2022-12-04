@@ -1,0 +1,37 @@
+{% extends 'portal.html'%}
+{% block title %}My Sandbox{% endblock %}
+{% block title_call_to_action %}
+<a href="{{ url_for('ie-tools.edit_model') }}" class="btn btn-outline-info">
+    Add model
+</a>
+{% endblock %}
+{% block content %}
+<table class="table table-borderless table-hover mt-2">
+    <thead class="bg-info text-white">
+        <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Population</th>
+            <th scope="col">Date</th>
+            <th scope="col">Elements</th>
+            <th scope="col">Relationships</th>
+            <th scope="col"></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for model in models %}
+            <tr>
+                <td class="font-weight-bold py-3">{{ model["name"] }}</td>
+                <td class="font-weight-bold py-3">{{ model["population"] }}</td>
+                <td class="font-weight-bold py-3">{{ model["date"] }}</td>
+                <td class="font-weight-bold py-3">{{ model["elements"] }}</td>
+                <td class="font-weight-bold py-3">{{ model["relationships"] }}</td>
+                <td class="align-middle text-right">
+                    <a href="{{ url_for('ie-tools.edit_model', id=model['id']) }}" class="btn btn-outline-info">
+                        Edit
+                    </a>
+                </td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

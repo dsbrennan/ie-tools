@@ -1,0 +1,10 @@
+{
+    "version": "1.1.0",
+    "name": "sandbox-structure",
+    "population": "sandbox-population",
+    "timestamp": 0,
+    "models": {
+        "irreducibleElement": {
+        }
+    }
+}
