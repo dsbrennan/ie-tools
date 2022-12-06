@@ -15,6 +15,7 @@
             <th scope="col">Elements</th>
             <th scope="col">Relationships</th>
             <th scope="col"></th>
+            <th scope="col"></th>
         </tr>
     </thead>
     <tbody>
@@ -28,6 +29,11 @@
                 <td class="align-middle text-right">
                     <a href="{{ url_for('ie-tools.edit_model', id=model['id']) }}" class="btn btn-outline-info">
                         Edit
+                    </a>
+                </td>
+                <td class="align-middle text-right">
+                    <a href="{{ url_for('ie-tools.validate_model', population=model['population'], name=model['name'], timestamp=model['timestamp']) }}" class="btn btn-outline-info">
+                        Validate
                     </a>
                 </td>
             </tr>

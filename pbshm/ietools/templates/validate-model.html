@@ -1,0 +1,162 @@
+{% extends 'portal.html' %}
+{% block javascript %}
+<script>
+    $(document).ready(function () {
+        //Make Card Request
+        function makeCardRequest(cardSelector, dataCallback, completeCallback) {
+            var start;
+            var request = new XMLHttpRequest();
+            request.onreadystatechange = function () {
+                var card = $(cardSelector);
+                if (this.readyState == 4 && this.status == 200) {//OK Status
+                    var end = performance.now();
+                    dataCallback(card, JSON.parse(this.responseText));
+                    $(".card.bg-success").removeClass("bg-success").addClass("bg-info");
+                    card.removeClass("bg-warning").addClass("bg-success");
+                    card.find("[data-request-status='time']").text(((end - start) / 1000).toFixed(4));
+                    card.find("[data-request-status='connection']").addClass("d-none");
+                    card.find("[data-request-status='data']").removeClass("d-none");
+                    card.find("[data-request-status='next']").removeAttr("disabled");
+                    if (typeof (completeCallback) !== typeof (undefined)) completeCallback(card, JSON.parse(this.responseText));
+                } else if (this.readyState == 1) {//Connection Established
+                    start = performance.now();
+                    card.addClass("text-white bg-warning");
+                    card.find("[data-request-status='pending']").addClass("d-none");
+                    card.find("[data-request-status='connection']").removeClass("d-none");
+                } else if (this.readyState == 4) {//Error Status
+                    card.removeClass("bg-warning").addClass("bg-danger");
+                    card.find("[data-request-status='error']").text("Error " + this.status + ": " + this.statusText).removeClass("d-none");
+                    card.find("[data-request-status='connection']").addClass("d-none");
+                }
+            };
+            return request;
+        }
+
+        //Step 3: Include
+        $("#include-model").one("click", function () {
+            var button = $(this);
+            var includeHTTPRequest = new XMLHttpRequest();
+            includeHTTPRequest.onreadystatechange = function () {
+                if (this.readyState == 4 && this.status == 200) {//OK Status
+                    var json = JSON.parse(this.responseText);
+                    if (!json["validated"]) {
+                        button.removeClass("btn-outline-warning").addClass("btn-outline-danger");
+                        button.text("IE Model not validated, please try again").attr("disabled", true);
+                    } else {
+                        button.removeClass("btn-outline-warning").addClass("btn-outline-success");
+                        button.text("Included").attr("disabled", true);
+                    }
+                    button.find("[data-request-status='connection']").addClass("d-none");
+                } else if (this.readyState == 1) {//Connection Established
+                    button.removeClass("btn-outline-info").addClass("btn-outline-warning");
+                    button.find("[data-request-status='connection']").removeClass("d-none");
+                } else if (this.readyState == 4) {//Error Status
+                    button.removeClass("btn-outline-warning").addClass("btn-outline-danger");
+                    button.text("Error " + this.status + ": " + this.statusText).attr("disabled", true);
+                    button.find("[data-request-status='connection']").addClass("d-none");
+                }
+            };
+            includeHTTPRequest.open("GET", '{{ url_for("ie-tools.include_model", name=name, population=population, timestamp=timestamp) }}');
+            includeHTTPRequest.setRequestHeader("Accept", "application/json");
+            includeHTTPRequest.send();
+        });
+
+        //Step 2: Logic
+        var logicHTTPRequest = makeCardRequest("#card-logic", function (card, json) {
+            card.find("[data-remote-field='validated']").text(json["validated"] ? "Passed" : "Failed");
+            if (!json["validated"]) {
+                var details = json["details"];
+                var displayDictionary = {};
+                for (let i in details) {
+                    if (details[i]["type"] in displayDictionary) displayDictionary[details[i]["type"]] += "<br>" + details[i]["description"];
+                    else displayDictionary[details[i]["type"]] = details[i]["description"];
+                    text += "<strong>" + details[i]["type"] + "</strong><p>" + details[i]["description"] + "</p><br/>"
+                }
+                var text = "";
+                for (let key in displayDictionary) {
+                    text += "<strong>" + key + "</strong><p>" + displayDictionary[key] + "</p>"
+                }
+                card.find("[data-request-status='error']").html(text).removeClass("d-none").addClass("bg-light text-dark");
+            }
+        }, function (card, json) {
+            if (!json["validated"]) {
+                card.removeClass("bg-success").addClass("bg-danger");
+                card.find("[data-request-status='data']").addClass("d-none");
+            }
+        });
+
+        //Step 1: Syntax
+        var syntaxHTTPRequest = makeCardRequest("#card-syntax", function (card, json) {
+            card.find("[data-remote-field='validated']").text(json["validated"] ? "Passed" : "Failed");
+            if (!json["validated"]) card.find("[data-request-status='error']").text(JSON.stringify(json["details"])).removeClass("d-none").addClass("bg-light text-dark");
+        }, function (card, json) {
+            if (!json["validated"]) card.removeClass("bg-success").addClass("bg-danger");
+            else {
+                card.find("[data-request-status='data']").addClass("d-none");
+                logicHTTPRequest.open("GET", '{{ url_for("ie-tools.validate_logic", name=name, population=population, timestamp=timestamp) }}');
+                logicHTTPRequest.setRequestHeader("Accept", "application/json");
+                logicHTTPRequest.send();
+            }
+        });
+        syntaxHTTPRequest.open("GET", '{{ url_for("ie-tools.validate_syntax", name=name, population=population, timestamp=timestamp) }}');
+        syntaxHTTPRequest.setRequestHeader("Accept", "application/json");
+        syntaxHTTPRequest.send();
+    });
+</script>
+{% endblock %}
+{% block title %}{{ name }}{% endblock %}
+{% block content %}
+<!-- syntax -->
+<div id="card-syntax" class="card my-3">
+    <div class="card-header d-flex flex-row">
+        <span class="mr-2">Syntax</span>
+        <div class="ml-auto">
+            Status: <strong data-remote-field="validated" class="ml-2">-</strong>
+        </div>
+    </div>
+    <div data-request-status="pending" class="card-body text-secondary">
+        Warming up the system ...
+    </div>
+    <div data-request-status="connection" class="card-body text-secondary bg-light d-none">
+        <div class="d-flex align-items-center">
+            Checking the syntax of the IE model.
+            <div class="spinner-border ml-auto text-secondary" role="status" aria-hidden="true">
+            </div>
+        </div>
+    </div>
+    <div data-request-status="error" class="card-body d-none">
+    </div>
+</div>
+
+<!-- logic -->
+<div id="card-logic" class="card my-3">
+    <div class="card-header d-flex flex-row">
+        <span class="mr-2">Logic</span>
+        <div class="ml-auto">
+            Status: <strong data-remote-field="validated" class="ml-2">-</strong>
+        </div>
+    </div>
+    <div data-request-status="pending" class="card-body text-secondary">
+        Pending the passing of the syntax.
+    </div>
+    <div data-request-status="connection" class="card-body text-secondary bg-light d-none">
+        <div class="d-flex align-items-center">
+            Checking the logic of the IE model.
+            <div class="spinner-border ml-auto text-secondary" role="status" aria-hidden="true">
+            </div>
+        </div>
+    </div>
+    <div data-request-status="error" class="card-body d-none">
+    </div>
+    <div data-request-status="data" class="card-body text-dark bg-light d-none">
+        <div class="text-right">
+            <button id="include-model" type="button" class="btn btn-outline-info">
+                Include IE model into global collection
+                <div data-request-status="connection" class="spinner-border d-none my-auto" role="status"
+                    aria-hidden="true">
+                </div>
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}

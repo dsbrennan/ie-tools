@@ -1,6 +1,6 @@
 from flask import Blueprint, request, render_template, url_for, redirect
 from pbshm.authentication.authentication import authenticate_request
-from pbshm.ietools.tools import ensure_sandbox_setup, sandbox_collection, load_default_json, validate_json, insert_staging_document, update_staging_document
+from pbshm.ietools.tools import ensure_sandbox_setup, sandbox_collection, load_default_json, validate_json, insert_staging_document, update_staging_document, validate_model_syntax, validate_model_logic, include_validated_model
 from pbshm.pathfinder.pathfinder import nanoseconds_since_epoch_to_datetime
 import json
 import bson.objectid
@@ -21,12 +21,13 @@ def list_models():
     models = []
     for document in sandbox_collection(False).find():
         models.append({
-            "id":document["_id"],
-            "name":document["name"],
-            "population":document["population"],
-            "date":nanoseconds_since_epoch_to_datetime(document["timestamp"]),
-            "elements":len(document["models"]["irreducibleElement"]["elements"]) if "models" in document and "irreducibleElement" in document["models"] and "elements" in document["models"]["irreducibleElement"] else 0,
-            "relationships":len(document["models"]["irreducibleElement"]["relationships"]) if "models" in document and "irreducibleElement" in document["models"] and "relationships" in document["models"]["irreducibleElement"] else 0
+            "id": document["_id"],
+            "name": document["name"],
+            "population": document["population"],
+            "timestamp": document["timestamp"],
+            "date": nanoseconds_since_epoch_to_datetime(document["timestamp"]),
+            "elements": len(document["models"]["irreducibleElement"]["elements"]) if "models" in document and "irreducibleElement" in document["models"] and "elements" in document["models"]["irreducibleElement"] else 0,
+            "relationships": len(document["models"]["irreducibleElement"]["relationships"]) if "models" in document and "irreducibleElement" in document["models"] and "relationships" in document["models"]["irreducibleElement"] else 0
         })
     # Render
     return render_template("list-models.html", models=models)
@@ -82,3 +83,26 @@ def edit_model(id):
         errors=errors, 
         model=json.dumps(model, indent=4) if model is not None else request.form["ie-model-json"]
     )
+
+@bp.route("/sandbox/<population>/<name>/<int:timestamp>/validate")
+@authenticate_request("ie-tools-validate")
+def validate_model(population: str, name: str, timestamp: int):
+    return render_template("validate-model.html", name=name, population=population, timestamp=timestamp)
+
+@bp.route("/sandbox/<population>/<name>/<int:timestamp>/include")
+@authenticate_request("ie-tools-include")
+def include_model(population: str, name: str, timestamp: int):
+    validation = include_validated_model(name, population, timestamp)
+    return {"validated": validation}
+
+@bp.route("/sandbox/<population>/<name>/<int:timestamp>/validate-syntax")
+@authenticate_request("ie-tools-validate-syntax")
+def validate_syntax(population: str, name: str, timestamp: int):
+    validation = validate_model_syntax(name, population, timestamp)
+    return {"validated": validation[0], "details": validation[1]}
+
+@bp.route("/sandbox/<population>/<name>/<int:timestamp>/validate-logic")
+@authenticate_request("ie-tools-validate-logic")
+def validate_logic(population: str, name: str, timestamp: int):
+    validation = validate_model_logic(name, population, timestamp)
+    return {"validated": validation[0], "details": validation[1]}

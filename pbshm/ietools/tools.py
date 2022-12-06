@@ -3,6 +3,7 @@ from pbshm.db import db_connect
 from pbshm.mechanic.mechanic import create_new_structure_collection
 from typing import Tuple
 import json
+import pymongo
 import pymongo.errors
 import bson.objectid
 import pymongo.collection
@@ -76,3 +77,170 @@ def update_staging_document(id: str, document: object) -> Tuple[str, str]:
     except pymongo.errors.PyMongoError:
         errors += "Unable to update the document (generic error)"
     return errors, id
+
+def validate_model_syntax(name: str, population: str, timestamp: int) -> Tuple[bool, object]:
+    sandbox_collection(True).delete_many({
+        "$and":[
+            {"name": name},
+            {"population": population},
+            {"timestamp": timestamp}
+        ]
+    })
+    try:
+        sandbox_collection(False).aggregate([
+            {"$match":{
+                "name": name,
+                "population": population,
+                "timestamp": timestamp
+            }},
+            {"$project":{
+                "_id": 0
+            }},
+            {"$merge": sandbox_collection_name(g.user["_id"], True)}
+        ])
+        return True, None
+    except pymongo.errors.OperationFailure as err:
+        error = {}
+        if err.details["code"] == 121:
+            error["reason"] = "Document failed PBSHM Schema validation"
+            error["document"] = str(err.details["errInfo"]["failingDocumentId"])
+            error["cause"] = err.details["errInfo"]["details"]["schemaRulesNotSatisfied"]
+        return False, error
+
+def model_logic_error(type:str, objects: list, documents: list, description: str) -> object:
+    return {
+        "type": type,
+        "objects": objects,
+        "documents": documents,
+        "description": description
+    }
+
+def validate_model_logic(name: str, population: str, timestamp: int) -> Tuple[bool, object]:
+    model_type, model_type_document_id = "", ""
+    errors, elements, relationships = [], [], []
+    element_documents, relationship_documents = [], []
+    for document in sandbox_collection(True).find({
+        "$and":[
+            {"name": name},
+            {"population": population},
+            {"timestamp": timestamp}
+        ]
+    }):
+        id = str(document["_id"])
+        model = document["models"]["irreducibleElement"]
+        type = model["type"]
+        # Type
+        if model_type == "":
+            model_type = type
+            model_type_document_id = id
+        elif model_type != type:
+            errors.append(model_logic_error(
+                "conflicting model types",
+                [model_type, type],
+                [model_type_document_id, id],
+                f"The first document in the model declares the type as a {model_type}, however, {id} declares it as a {type}"
+            ))
+        # Unique elements
+        for element in model["elements"]:
+            name = element["name"]
+            for existing in element_documents:
+                if existing[0] == name:
+                    errors.append(model_logic_error(
+                        "duplicate element",
+                        [name],
+                        [id, existing[1]],
+                        f"The element {name} is declared in {id} as well as being declared in {existing[1]}"
+                    ))
+                    break
+            elements.append(element)
+            element_documents.append((name, id))
+        # Unique relationships
+        for relationship in model["relationships"]:
+            name = relationship["name"]
+            for existing in relationship_documents:
+                if existing[0] == name:
+                    errors.append(model_logic_error(
+                        "duplicate relationship",
+                        [name],
+                        [id, existing[1]],
+                        f"The relationship {name} is declared in {id} as well as being declared in {existing[1]}"
+                    ))
+                    break
+            relationships.append(relationship)
+            relationship_documents.append((name, id))
+    # Model type requirements
+    if model_type == "grounded":
+        ground_element_count = 0
+        for element in elements:
+            if element["type"] == "ground":
+                ground_element_count += 1
+                break
+        if ground_element_count == 0:
+            errors.append(model_logic_error(
+                "missing ground",
+                [model_type],
+                [],
+                f"The model is declared as a {model_type} model, however, it has no ground elements"
+            ))
+    # Relationship elements
+    elements_used = []
+    for relationship in relationships:
+        id, name = "", relationship["name"]
+        for source in relationship_documents:
+            if name == source[0]:
+                id = source[1]
+                break
+        for relationship_element in relationship["elements"]:
+            relationship_element_name = relationship_element["name"]
+            element_exists = False
+            for element in elements:
+                if relationship_element_name == element["name"]:
+                    element_exists = True
+                    break
+            if not element_exists:
+                errors.append(model_logic_error(
+                    "missing element",
+                    [name, relationship_element_name],
+                    [id],
+                    f"The relationship {name} declared in {id} uses the element {relationship_element_name}, however, it doesn't exist within the model"
+                ))
+            else:
+                elements_used.append(relationship_element_name)
+    # Orphaned elements
+    for element in elements:
+        name = element["name"]
+        if name not in elements_used:
+            id = ""
+            for source in element_documents:
+                if name == source[0]:
+                    id = source[1]
+                    break
+            errors.append(model_logic_error(
+                "orphaned element",
+                [name],
+                [id],
+                f"The element {name} is declared in {id}, however, it is never used within a relationship"
+            ))
+    return True if len(errors) == 0 else False, errors
+
+def include_validated_model(name: str, population: str, timestamp: int) -> bool:
+    validated = validate_model_syntax(name, population, timestamp)
+    if not validated[0]:
+        return False
+    validated = validate_model_logic(name, population, timestamp)
+    if not validated[0]:
+        return False
+    sandbox_collection(True).aggregate([
+        {"$match":{
+            "$and":[
+                {"name": name},
+                {"population": population},
+                {"timestamp": timestamp}
+            ]
+        }},
+        {"$project":{
+            "_id": 0
+        }},
+        {"$merge": current_app.config["STRUCTURE_COLLECTION"]}
+    ])
+    return True
