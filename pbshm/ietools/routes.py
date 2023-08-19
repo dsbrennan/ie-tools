@@ -1,6 +1,6 @@
 from flask import Blueprint, request, render_template, url_for, redirect
 from pbshm.authentication.authentication import authenticate_request
-from pbshm.ietools.tools import ensure_sandbox_setup, sandbox_collection, load_default_json, validate_json, insert_staging_document, update_staging_document, validate_model_syntax, validate_model_logic, include_validated_model
+from pbshm.ietools.tools import ensure_sandbox_setup, sandbox_collection, load_default_json, validate_json, validate_basic_document_structure, insert_staging_document, update_staging_document, validate_model_syntax, validate_model_logic, include_validated_model
 from pbshm.pathfinder.pathfinder import nanoseconds_since_epoch_to_datetime
 import json
 import bson.objectid
@@ -13,11 +13,39 @@ bp = Blueprint(
 )
 
 # List Route
-@bp.route("/")
+@bp.route("/", methods=("GET", "POST"))
 @authenticate_request("ie-tools-list")
 def list_models():
     # Ensure Setup
     ensure_sandbox_setup()
+    # Upload
+    errors = ""
+    if request.method == "POST":
+        if "model" not in request.files:
+            errors += "No upload found"
+        else:
+            file = request.files["model"]
+            if file.filename.strip() == '':
+                errors += "No file selected"
+            elif file.filename.rsplit('.', 1)[1].lower() != 'json':
+                errors += "This upload only accepts json files"
+            else:
+                validated_json = validate_json(file.read())
+                if not validated_json[0]:
+                    errors += f"Was unable to save the IE Model as it was not valid JSON: {validated_json[1]}"
+                else:
+                    model = validated_json[2]
+                    validated_basic_syntax = validate_basic_document_structure(model)
+                    if not validated_basic_syntax[0]:
+                        errors += validated_basic_syntax[1]
+                    else:
+                        model_errors, model_id = insert_staging_document(model)
+                        if len(model_errors) > 0:
+                            errors += model_errors
+                        elif model_id is not None:
+                            return redirect(url_for(f"{bp.name}.validate_model", population=model["population"], name=model["name"], timestamp=model["timestamp"]))
+
+    # Load Models
     models = []
     for document in sandbox_collection(False).find():
         models.append({
@@ -30,7 +58,7 @@ def list_models():
             "relationships": len(document["models"]["irreducibleElement"]["relationships"]) if "models" in document and "irreducibleElement" in document["models"] and "relationships" in document["models"]["irreducibleElement"] else 0
         })
     # Render
-    return render_template("list-models.html", models=models)
+    return render_template("list-models.html", errors=errors, models=models)
 
 # Edit Route
 @bp.route("/sandbox/edit", defaults={"id": None}, methods=("GET", "POST"))
@@ -57,16 +85,9 @@ def edit_model(id):
                 errors += f"Was unable to save the IE Model as it was not valid JSON: {validated_json[1]}"
             else:
                 model = validated_json[2]
-                if "name" not in validated_json[2]:
-                    errors += f"You must have a structure name before you can save it into the system"
-                elif "population" not in validated_json[2]:
-                    errors += f"You must have a population before you can save it into the system"
-                elif "timestamp" not in validated_json[2]:
-                    errors += f"You must have a timestamp before you can save it into the system"
-                elif "models" not in validated_json[2]:
-                    errors += f"You must have declared a model before you can save into into the system"
-                elif "irreducibleElement" not in validated_json[2]["models"]:
-                    errors += f"You must have declared a irreducible element model before you can save into into the system"
+                validated_basic_syntax = validate_basic_document_structure(model)
+                if not validated_basic_syntax[0]:
+                    errors += validated_basic_syntax[1]
                 else:
                     model_errors, model_id = update_staging_document(id, model) if id is not None else insert_staging_document(model)
                     if len(model_errors) > 0:
