@@ -53,7 +53,7 @@ def list_models():
             "name": document["name"],
             "population": document["population"],
             "timestamp": document["timestamp"],
-            "date": nanoseconds_since_epoch_to_datetime(document["timestamp"]),
+            "date": nanoseconds_since_epoch_to_datetime(document["timestamp"]).strftime("%d/%m/%Y %H:%M:%S"),
             "elements": len(document["models"]["irreducibleElement"]["elements"]) if "models" in document and "irreducibleElement" in document["models"] and "elements" in document["models"]["irreducibleElement"] else 0,
             "relationships": len(document["models"]["irreducibleElement"]["relationships"]) if "models" in document and "irreducibleElement" in document["models"] and "relationships" in document["models"]["irreducibleElement"] else 0
         })
@@ -73,7 +73,7 @@ def edit_model(id):
     if request.method == "GET":
         if id is not None:
             for document in sandbox_collection(False).find({"_id": bson.objectid.ObjectId(id)}, {"_id": 0}).limit(1):
-                name = f"{document['population']}, {document['name']}, {document['timestamp']}"
+                name = f"{document['population']}, {document['name']}, {nanoseconds_since_epoch_to_datetime(document['timestamp']).strftime('%d/%m/%Y %H:%M:%S')}"
                 model = document
                 break
     elif request.method == "POST":
@@ -95,7 +95,7 @@ def edit_model(id):
                     elif id is None and model_id is not None:
                         return redirect(url_for(f"{bp.name}.edit_model", id=model_id))
                     elif id is not None:
-                        name = f"{validated_json[2]['population']}, {validated_json[2]['name']}, {validated_json[2]['timestamp']}"
+                        name = f"{validated_json[2]['population']}, {validated_json[2]['name']}, {nanoseconds_since_epoch_to_datetime(validated_json[2]['timestamp']).strftime('%d/%m/%Y %H:%M:%S')}"
     
     return render_template(
         "edit-model.html", 
