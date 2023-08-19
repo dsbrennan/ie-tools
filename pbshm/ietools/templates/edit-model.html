@@ -8,7 +8,7 @@
 {% block content %}
 <form method="POST" class="d-flex flex-column">
     <div class="row mb-3">
-        <div class="col-8">
+        <div class="col-9">
             {% if errors|length > 0 %}
             <div class="card bg-danger text-white">
                 <div class="card-header">Error processing request</div>
@@ -17,7 +17,7 @@
                 </div>
             </div>
             {% else %}
-            <div class="card bg-info text-white">
+            <div class="card bg-secondary text-white">
                 <div class="card-header">Information</div>
                 <div class="card-body">
                     <p class="card-text">Paste into the textbox below your Irreducible Element model JSON, you then will be able to save and validate this IE Model</p>
@@ -26,9 +26,72 @@
             {% endif %}
         </div>
         <div class="col">
-            <button type="submit" name="save" class="btn btn-block btn-outline-secondary">
+            <button type="submit" name="save" class="btn btn-block btn-outline-info">
                 Save
             </button>
+            <div class="d-flex flex-row my-2">
+                <button type="button" data-card-signal="utility" class="btn btn-block btn-outline-secondary">
+                    Toggle utilities
+                </button>
+            </div>
+        </div>
+    </div>
+    <div data-card-class="utility" class="card mt-1 mb-3">
+        <div class="card-header">
+            <a href="#convert-timestamp" class="btn btn-outline-secondary btn-sm float-right my-n1">
+                Insert timestamp
+            </a>
+            Date/Time to timestamp
+        </div>
+        <div class="card-body d-flex flex-column flex-xl-row justify-content-xl-center">
+            <div class="d-flex flex-row mb-2">
+                <div class="input-group mr-2">
+                    <div class="input-group-prepend">
+                        <div class="input-group-text">Year</div>
+                    </div>
+                    <input id="year" type="number" min="0000" max="9999" step="1" class="form-control" placeholder="2023">
+                </div>
+                <div class="input-group mr-2">
+                    <div class="input-group-prepend">
+                        <div class="input-group-text">Month</div>
+                    </div>
+                    <input id="month" type="number" min="01" max="12" step="1" class="form-control" placeholder="01">
+                </div>
+                <div class="input-group">
+                    <div class="input-group-prepend">
+                        <div class="input-group-text">Day</div>
+                    </div>
+                    <input id="day" type="number" min="01" max="31" step="1" class="form-control" placeholder="01">
+                </div>
+            </div>
+            <div class="d-flex flex-row mb-2">
+                <div class="input-group mr-2 ml-xl-2">
+                    <div class="input-group-prepend">
+                        <div class="input-group-text">Hour</div>
+                    </div>
+                    <input id="hour" type="number" min="00" max="23" step="1" class="form-control" placeholder="12">
+                </div>
+                <div class="input-group mr-2">
+                    <div class="input-group-prepend">
+                        <div class="input-group-text">Min</div>
+                    </div>
+                    <input id="minute" type="number" min="00" max="59" step="1" class="form-control" placeholder="00">
+                </div>
+                <div class="input-group">
+                    <div class="input-group-prepend">
+                        <div class="input-group-text">Sec</div>
+                    </div>
+                    <input id="second" type="number" min="00" max="59" step="1" class="form-control" placeholder="00">
+                </div>
+            </div>
+            <div>
+                <div class="input-group ml-xl-2">
+                    <div class="input-group-prepend">
+                        <div class="input-group-text">Time Zone</div>
+                    </div>
+                    <input id="offset" type="number" min="-12" max="12" step="1" class="form-control" placeholder="00">
+                </div>
+            </div>
         </div>
     </div>
     <div class="form-group d-flex flex-column flex-fill">
@@ -36,4 +99,52 @@
         <textarea name="ie-model-json" class="form-control flex-fill" rows="15" required>{{ model }}</textarea>
     </div>
 </form>
+{% endblock %}
+{% block javascript %}
+    <script type="text/javascript">
+        $(document).ready(function (){
+            //Setup Cards
+            $("div[data-card-class]").addClass("d-none");
+            $("[data-card-signal]").click(function(){
+                card = $("div[data-card-class='" + $(this).attr("data-card-signal") + "']");
+                if(card.hasClass("d-none")){
+                    card.removeClass("d-none");
+                }else{
+                    card.addClass("d-none");
+                }
+            });
+            //Setup Date
+            current_date = new Date(Date.now());
+            $("#year").val(current_date.getFullYear());
+            $("#month").val(current_date.getMonth() + 1);
+            $("#day").val(current_date.getDate());
+            $("#hour").val(current_date.getHours());
+            $("#minute").val(current_date.getMinutes());
+            $("#second").val(current_date.getSeconds());
+            $("#offset").val((current_date.getTimezoneOffset() / 60) * -1)
+            //Convert
+            $("a[href='#convert-timestamp']").click(function(){
+                //Ensure inputs
+                invalid = 0
+                inputs = $("#year, #month, #day, #hour, #minute, #second, #offset");
+                inputs.each(function(){
+                    $(this).removeClass("is-invalid");
+                    if($(this).val().trim().length == 0){
+                        $(this).addClass("is-invalid");
+                        invalid++;
+                    }
+                });
+                if(invalid > 0){
+                    return;
+                }
+                //Convert datetime
+                offset = parseInt($("#offset").val())
+                isoString = $("#year").val().padStart(4, '0') + '-' + $("#month").val().padStart(2, '0') + '-' + $("#day").val().padStart(2, '0') + 'T' + $("#hour").val().padStart(2, '0') + ':' + $("#minute").val().padStart(2, '0') + ':' + $("#second").val().padStart(2, '0') + ".000" + ((offset < 0) ? '-' + (offset * -1).toString().padStart(2, '0') : '+' + offset.toString().padStart(2, '0')) + ":00";
+                date = new Date(isoString);
+                model = JSON.parse($("textarea[name='ie-model-json']").val());
+                model["timestamp"] = date.getTime() * 1000000;
+                $("textarea[name='ie-model-json']").val(JSON.stringify(model, null, "\t"));
+            });
+        });
+    </script>
 {% endblock %}
