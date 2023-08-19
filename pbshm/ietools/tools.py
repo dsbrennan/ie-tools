@@ -52,6 +52,20 @@ def validate_json(json_str: str) -> Tuple[bool, str, object]:
         return False, err, {}
     return True, "", json_object
 
+def validate_basic_document_structure(document: object) -> Tuple[bool, str]:
+    errors = ""
+    if "name" not in document:
+        errors += f"You must have a structure name before you can save it into the system"
+    elif "population" not in document:
+        errors += f"You must have a population before you can save it into the system"
+    elif "timestamp" not in document:
+        errors += f"You must have a timestamp before you can save it into the system"
+    elif "models" not in document:
+        errors += f"You must have declared a model before you can save into into the system"
+    elif "irreducibleElement" not in document["models"]:
+        errors += f"You must have declared a irreducible element model before you can save into into the system"
+    return True if len(errors) == 0 else False, errors
+
 def insert_staging_document(document: object) -> Tuple[str, str]:
     errors, id = "", ""
     try:
