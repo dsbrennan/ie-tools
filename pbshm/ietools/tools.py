@@ -257,6 +257,6 @@ def include_validated_model(name: str, population: str, timestamp: int) -> bool:
         {"$project":{
             "_id": 0
         }},
-        {"$merge": current_app.config["STRUCTURE_COLLECTION"]}
+        {"$merge": current_app.config["DEFAULT_COLLECTION"]}
     ])
     return True
