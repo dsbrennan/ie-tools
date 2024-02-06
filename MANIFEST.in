@@ -1,0 +1,4 @@
+global-include *.html
+global-include *.css
+include pbshm/ietools/files/*.json
+exclude pbshm/__init__.py
