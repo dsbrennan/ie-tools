@@ -130,12 +130,3 @@ dmypy.json
 
 # Ignore VS Code folder
 .vscode/
-
-# Ignore PBSHM Flask Core Folder/Files
-pbshm/authentication/
-pbshm/initialisation/
-pbshm/mechanic/
-pbshm/pathfinder/
-pbshm/static/
-pbshm/templates/
-pbshm/db.py

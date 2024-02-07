@@ -1,12 +1,14 @@
-from flask import g, current_app
-from pbshm.db import db_connect
-from pbshm.mechanic.mechanic import create_new_structure_collection
-from typing import Tuple
 import json
-import pymongo
-import pymongo.errors
+from typing import Tuple
+
 import bson.objectid
+import pymongo
 import pymongo.collection
+import pymongo.errors
+from flask import g, current_app
+
+from pbshm.db import db_connect
+from pbshm.mechanic import create_new_structure_collection
 
 def sandbox_collection_name(user_id: str, validation: bool) -> str:
     return f"sandbox-validation-{user_id}" if validation else f"sandbox-free-{user_id}"
@@ -255,6 +257,6 @@ def include_validated_model(name: str, population: str, timestamp: int) -> bool:
         {"$project":{
             "_id": 0
         }},
-        {"$merge": current_app.config["STRUCTURE_COLLECTION"]}
+        {"$merge": current_app.config["DEFAULT_COLLECTION"]}
     ])
     return True
