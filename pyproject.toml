@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pbshm-ie-toolbox"
-version = "0.1"
+version = "0.1.1"
 authors = [
     { name = "Dan Brennan", email = "d.s.brennan@sheffield.ac.uk" }
 ]
