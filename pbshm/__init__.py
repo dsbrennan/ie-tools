@@ -31,9 +31,23 @@ def create_app(test_config=None):
     except OSError:
         pass
 
+    #Calculate site packages folder
+    pbshm_directory, package_paths = None, site.getsitepackages()
+    selected_package_path = os.path.join(package_paths[1 if len(package_paths) > 1 and sys.platform == "win32" else 0], "pbshm")
+    if os.path.isdir(selected_package_path): pbshm_directory = selected_package_path
+    else:
+        for path in package_paths:
+            potential_path = os.path.join(path, "pbshm")
+            if potential_path == selected_package_path:
+                continue
+            elif os.path.isdir(potential_path):
+                pbshm_directory = potential_path
+                break
+    if pbshm_directory is None:
+        raise Exception(f"Unable to find site packages with the PBSHM namespace, paths searched: {package_paths}")
+
     #Include PBSHM Core Packages
     importlib.invalidate_caches()
-    pbshm_directory = os.path.join(site.getsitepackages()[0], "pbshm")
     pbshm_modules = {
         "pbshm.db": {
             "path": ["db.py"],
